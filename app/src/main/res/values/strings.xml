@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Assets Recovery</string>
+    <string name="app_subtitle">Images &amp; Videos Recovery</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_images">Images</string>
+    <string name="nav_videos">Videos</string>
+    <string name="nav_recovered">Recovered</string>
+    <string name="nav_help">Help &amp; Info</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Recovery Center</string>
+    <string name="dashboard_header_subtitle">Find and restore accessible images &amp; videos</string>
+    <string name="stat_images_found">Images Found</string>
+    <string name="stat_videos_found">Videos Found</string>
+    <string name="stat_recoverable">Recoverable Items</string>
+    <string name="stat_recovered">Successfully Recovered</string>
+    <string name="btn_start_scan">Start Deep Scan</string>
+    <string name="btn_scanning">Scanning Device Storage&#8230;</string>
+    <string name="btn_cancel_scan">Cancel Scan</string>
+    <string name="last_scan_never">Last scan: Never</string>
+    <string name="last_scan_prefix">Last scan: </string>
+    <string name="scan_in_progress">Scanning files&#8230;</string>
+    <string name="permission_granted">Media access granted</string>
+    <string name="permission_required">Storage permission required</string>
+    <string name="btn_grant_permission">Grant Access</string>
+
+    <!-- Honesty & Feasibility Disclosure -->
+    <string name="disclosure_title">How Recovery Works</string>
+    <string name="disclosure_body">This app safely finds: 1) Items in the device Media Trash / Recycle Bin, 2) Hidden or orphaned photos &amp; videos in app caches and .nomedia folders, and 3) Device media files. Note: On modern encrypted Android storage, permanently purged or overwritten files cannot be recovered without root access.</string>
+
+    <!-- Galleries -->
+    <string name="title_images">Image Gallery</string>
+    <string name="title_videos">Video Gallery</string>
+    <string name="title_recovered">Recovered Media</string>
+    <string name="filter_all">All Media</string>
+    <string name="filter_recoverable">Recoverable Only</string>
+    <string name="filter_trashed">Recycle Bin</string>
+    <string name="filter_hidden">Hidden / Orphaned</string>
+    <string name="filter_active">Active Media</string>
+
+    <!-- Actions & Selection -->
+    <string name="action_select_all">Select All</string>
+    <string name="action_deselect_all">Deselect All</string>
+    <string name="action_recover_selected">Recover Selected (%1$d)</string>
+    <string name="action_sort">Sort By</string>
+    <string name="sort_date_desc">Date: Newest First</string>
+    <string name="sort_date_asc">Date: Oldest First</string>
+    <string name="sort_size_desc">Size: Largest First</string>
+    <string name="sort_size_asc">Size: Smallest First</string>
+    <string name="sort_name_asc">Name: A to Z</string>
+    <string name="sort_name_desc">Name: Z to A</string>
+
+    <!-- Empty States -->
+    <string name="empty_dashboard_title">Ready to Scan</string>
+    <string name="empty_dashboard_desc">Tap the scan button above to locate recoverable media on your device.</string>
+    <string name="empty_images_title">No Images Found</string>
+    <string name="empty_images_desc">Run a scan from the Dashboard or adjust your active filters.</string>
+    <string name="empty_videos_title">No Videos Found</string>
+    <string name="empty_videos_desc">No video files matched the current scan and filter criteria.</string>
+    <string name="empty_recovered_title">No Recovered Files Yet</string>
+    <string name="empty_recovered_desc">Recovered images and videos will be saved to your device gallery and listed here.</string>
+
+    <!-- Recovery Workflow -->
+    <string name="recovery_dialog_title">Recovering Media&#8230;</string>
+    <string name="recovery_success_title">Recovery Completed</string>
+    <string name="recovery_result_format">Recovered: %1$d | Failed: %2$d | Skipped: %3$d</string>
+    <string name="action_view_folder">Open Recovery Folder</string>
+    <string name="action_share">Share</string>
+    <string name="action_close">Close</string>
+    <string name="action_preview">Preview</string>
+
+    <!-- Detail Dialog -->
+    <string name="detail_filename">Filename:</string>
+    <string name="detail_path">Location:</string>
+    <string name="detail_size">Size:</string>
+    <string name="detail_dimensions">Dimensions:</string>
+    <string name="detail_duration">Duration:</string>
+    <string name="detail_date">Modified:</string>
+    <string name="detail_status">Status:</string>
+
+    <!-- Status Badges -->
+    <string name="status_trashed">Recycle Bin</string>
+    <string name="status_hidden">Hidden / Orphaned</string>
+    <string name="status_active">Active</string>
+
+    <!-- Permission Dialog -->
+    <string name="perm_dialog_title">Media Access Required</string>
+    <string name="perm_dialog_message">Assets Recovery requires permission to access images and videos on your device to search for recoverable files. Your media is processed 100% on-device and never uploaded anywhere.</string>
+    <string name="perm_dialog_settings_message">Permission was previously denied. Please grant media permission in App Settings to allow scanning.</string>
+    <string name="btn_open_settings">Open Settings</string>
+    <string name="btn_cancel">Cancel</string>
+
+    <!-- Help & FAQ -->
+    <string name="help_title">Help &amp; Transparency</string>
+    <string name="help_subtitle">Understanding Android media recovery and privacy</string>
+    <string name="faq_storage_title">Can permanently purged files be recovered?</string>
+    <string name="faq_storage_desc">On Android 10 and newer, device storage uses File-Based Encryption (FBE) and flash memory TRIM commands. When a file is permanently erased and blocks are reclaimed, the raw sectors are zeroed and cryptographic keys destroyed. Without root access, low-level disk carving of purged blocks is mathematically and physically impossible. Anyone claiming otherwise is misleading you.</string>
+    <string name="faq_recoverable_title">What does Assets Recovery safely find?</string>
+    <string name="faq_recoverable_desc">1) MediaStore Recycle Bin: Photos and videos recently deleted in Gallery apps that remain preserved for up to 30 days.\n\n2) Hidden &amp; Orphaned Media: Photos and videos located in .nomedia folders, app caches (WhatsApp, Telegram, status caches), and unindexed subdirectories.\n\n3) Inaccessible Files: Media with broken extensions or corrupted headers that can be rescued and restored.</string>
+    <string name="faq_privacy_title">Is my personal media private?</string>
+    <string name="faq_privacy_desc">Yes, 100%. Assets Recovery processes all file operations completely on your device. We do not operate remote servers, collect analytics, or upload any personal files.</string>
+    <string name="faq_destination_title">Where are recovered files saved?</string>
+    <string name="faq_destination_desc">Files are restored directly to your public Pictures/RecoveredMedia or DCIM/RecoveredMedia library, making them immediately visible in Google Photos and your device Gallery.</string>
+
+    <string name="toast_no_selection">Please select at least one item to recover</string>
+    <string name="toast_scan_cancelled">Scan was cancelled</string>
+    <string name="toast_recovery_complete">Media recovery finished</string>
+    <string name="btn_view_images">View Images</string>
+    <string name="btn_view_videos">View Videos</string>
+    <string name="btn_view_recovered">View Recovered</string>
+</resources>

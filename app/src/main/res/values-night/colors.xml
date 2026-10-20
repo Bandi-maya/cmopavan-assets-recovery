@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand / Primary Colors (Dark) -->
+    <color name="primary">#2DD4BF</color>
+    <color name="primary_variant">#0D9488</color>
+    <color name="on_primary">#042F2E</color>
+    <color name="primary_container">#134E4A</color>
+    <color name="on_primary_container">#99F6E4</color>
+
+    <!-- Secondary / Accent Colors -->
+    <color name="secondary">#818CF8</color>
+    <color name="secondary_variant">#6366F1</color>
+    <color name="on_secondary">#1E1B4B</color>
+    <color name="secondary_container">#312E81</color>
+    <color name="on_secondary_container">#C7D2FE</color>
+
+    <!-- Success & Recovery Colors -->
+    <color name="recovery_green">#34D399</color>
+    <color name="recovery_green_container">#064E3B</color>
+    <color name="on_recovery_green">#022C22</color>
+    <color name="recovery_amber">#FBBF24</color>
+    <color name="recovery_amber_container">#78350F</color>
+    <color name="recovery_red">#F87171</color>
+
+    <!-- Neutrals & Surfaces (Dark) -->
+    <color name="background">#0F172A</color>
+    <color name="on_background">#F8FAFC</color>
+    <color name="surface">#1E293B</color>
+    <color name="on_surface">#F8FAFC</color>
+    <color name="surface_variant">#334155</color>
+    <color name="on_surface_variant">#CBD5E1</color>
+    <color name="surface_card">#1E293B</color>
+    <color name="card_stroke">#334155</color>
+    <color name="divider">#334155</color>
+    <color name="text_muted">#94A3B8</color>
+
+    <!-- Status Bar & Nav Bar -->
+    <color name="status_bar">#0F172A</color>
+    <color name="nav_bar">#1E293B</color>
+
+    <!-- Overlays -->
+    <color name="scrim">#B3000000</color>
+    <color name="badge_trash">#F87171</color>
+    <color name="badge_hidden">#A78BFA</color>
+    <color name="badge_active">#34D399</color>
+</resources>

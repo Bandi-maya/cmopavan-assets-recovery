@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Shield / Vault Shape -->
+    <path
+        android:fillColor="#0D9488"
+        android:pathData="M54,18 L84,30 L84,56 C84,74 71,90 54,96 C37,90 24,74 24,56 L24,30 Z" />
+    <!-- Recovery circular arrow / checkmark -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,34 C42.95,34 34,42.95 34,54 C34,65.05 42.95,74 54,74 C62.28,74 69.36,68.96 72.33,61.75 L67.12,59.62 C64.88,64.91 59.86,68.5 54,68.5 C46.01,68.5 39.5,61.99 39.5,54 C39.5,46.01 46.01,39.5 54,39.5 C58.26,39.5 62.08,41.36 64.72,44.33 L58,51 L76,51 L76,33 L70.21,38.79 C66.19,34.61 60.41,32 54,32 L54,34 Z" />
+    <!-- Media Play/Image Icon Center -->
+    <path
+        android:fillColor="#2DD4BF"
+        android:pathData="M50,47 L62,54 L50,61 Z" />
+</vector>
