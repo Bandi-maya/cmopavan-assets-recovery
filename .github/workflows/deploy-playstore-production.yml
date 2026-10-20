@@ -1,0 +1,272 @@
+name: Release – Production & Multi-Track
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.0.0 (no "v")'
+        required: true
+      rollout:
+        description: 'Share of Play users who get it first (0.1 = 10%, 1 = everyone, draft = draft release)'
+        required: false
+        default: '1'
+      changes_not_sent_for_review:
+        description: 'Do not automatically submit changes for review (true / false)'
+        required: false
+        default: 'false'
+      deploy_targets:
+        description: 'Where to deploy: all (Telegram + Internal + Production), internal_and_telegram, internal_only, production_only'
+        required: false
+        default: 'all'
+
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  ROLLOUT: ${{ github.event.inputs.rollout || '1' }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Quality gate & Version extraction
+  # ---------------------------------------------------------------------------
+  checks:
+    name: Analyze & test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Work out version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version must look like 1.0.0 (got '$VERSION')"; exit 1
+          fi
+          # Monotonically increasing version code based on minutes since epoch
+          BUILD_NUMBER=$(( $(date +%s) / 60 ))
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Releasing $VERSION ($BUILD_NUMBER)"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x ./gradlew
+
+      - name: Run Unit Tests
+        run: ./gradlew test
+
+  # ---------------------------------------------------------------------------
+  # 2. Android Build, Telegram Delivery & Google Play Deployment
+  # ---------------------------------------------------------------------------
+  android:
+    name: Build & publish Android
+    needs: [checks]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.checks.outputs.version }}
+      BUILD_NUMBER: ${{ needs.checks.outputs.build_number }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x ./gradlew
+
+      - name: Configure Android Release Keystore
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/upload-keystore.jks
+            cat <<EOF > key.properties
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=upload
+          storeFile=app/upload-keystore.jks
+          EOF
+          else
+            echo "::error::KEYSTORE_BASE64 secret is missing! Required for release signing."
+            exit 1
+          fi
+
+      - name: Build Android Release APK
+        if: ${{ github.event_name == 'push' || github.event.inputs.deploy_targets == 'all' || contains(github.event.inputs.deploy_targets, 'telegram') || contains(github.event.inputs.deploy_targets, 'internal_and_telegram') }}
+        run: |
+          ./gradlew assembleRelease "-PversionCode=$BUILD_NUMBER" "-PversionName=$VERSION"
+
+      - name: Send APK to Telegram
+        if: ${{ success() && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHANNEL_ID != '' && (github.event_name == 'push' || github.event.inputs.deploy_targets == 'all' || contains(github.event.inputs.deploy_targets, 'telegram') || contains(github.event.inputs.deploy_targets, 'internal_and_telegram')) }}
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        run: |
+          APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          fi
+          
+          APP_NAME="Assets Recovery"
+          COMMIT_SHA="${GITHUB_SHA::7}"
+          
+          CAPTION=$(cat <<EOF
+          🛡 $APP_NAME
+          🏷 Version: $VERSION
+          🔢 Build: $BUILD_NUMBER
+          🔗 Commit: $COMMIT_SHA
+          ✅ Status: Built Successfully
+          ⏰ Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          EOF
+          )
+          
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            -F chat_id="${TELEGRAM_CHANNEL_ID}" \
+            -F document=@"$APK_PATH" \
+            -F caption="$CAPTION"
+
+      - name: Build App Bundle (AAB)
+        run: |
+          ./gradlew bundleRelease "-PversionCode=$BUILD_NUMBER" "-PversionName=$VERSION"
+
+      - name: Write Play release notes
+        run: |
+          mkdir -p whatsnew
+          PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          if [ -n "$PREV" ]; then RANGE="$PREV..HEAD"; else RANGE="HEAD~20..HEAD"; fi
+          NOTES=$(git log $RANGE --pretty=format:'• %s' --no-merges | grep -v -i '^• \(merge\|chore\|ci\)' | head -n 12)
+          [ -z "$NOTES" ] && NOTES="Bug fixes and improvements."
+          printf '%s' "$NOTES" | cut -c1-500 > whatsnew/whatsnew-en-US
+          cat whatsnew/whatsnew-en-US
+
+      - name: Find R8 mapping file
+        id: mapping
+        run: |
+          F=$(find app/build/outputs/mapping/release -name "mapping.txt" | head -n 1)
+          if [ -f "$F" ]; then echo "file=$F" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Upload to Google Play (Internal Testing)
+        if: ${{ github.event_name == 'push' || github.event.inputs.deploy_targets == 'all' || contains(github.event.inputs.deploy_targets, 'internal') }}
+        continue-on-error: true
+        id: play-internal
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_CONFIG_JSON }}
+          packageName: com.logybyte.assetsrecovery
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          releaseName: ${{ env.VERSION }} (${{ env.BUILD_NUMBER }})
+          tracks: internal
+          status: completed
+          mappingFile: ${{ steps.mapping.outputs.file }}
+
+      - name: Upload to Google Play (Production, staged rollout)
+        if: ${{ github.event_name == 'push' || github.event.inputs.deploy_targets == 'all' || contains(github.event.inputs.deploy_targets, 'production') }}
+        continue-on-error: true
+        id: play-production
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_CONFIG_JSON }}
+          packageName: com.logybyte.assetsrecovery
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          releaseName: ${{ env.VERSION }} (${{ env.BUILD_NUMBER }})
+          tracks: production
+          status: ${{ env.ROLLOUT == 'draft' && 'draft' || (env.ROLLOUT == '1' && 'completed' || 'inProgress') }}
+          userFraction: ${{ (env.ROLLOUT != '1' && env.ROLLOUT != 'draft') && env.ROLLOUT || '' }}
+          changesNotSentForReview: ${{ github.event.inputs.changes_not_sent_for_review == 'true' }}
+          whatsNewDirectory: whatsnew
+          mappingFile: ${{ steps.mapping.outputs.file }}
+
+      - name: Keep build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: assetsrecovery-release-${{ env.VERSION }}
+          path: |
+            app/build/outputs/bundle/release/app-release.aab
+            app/build/outputs/apk/release/*.apk
+            ${{ steps.mapping.outputs.file }}
+          retention-days: 90
+
+      - name: Remove signing files
+        if: always()
+        run: rm -f app/upload-keystore.jks key.properties
+
+  # ---------------------------------------------------------------------------
+  # 3. GitHub Release + Telegram Summary
+  # ---------------------------------------------------------------------------
+  release:
+    name: GitHub Release & notify
+    needs: [checks, android]
+    if: always() && needs.android.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.checks.outputs.version }}
+      BUILD_NUMBER: ${{ needs.checks.outputs.build_number }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: assetsrecovery-release-${{ env.VERSION }}
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Assets Recovery ${{ env.VERSION }}
+          generate_release_notes: true
+          files: |
+            dist/**/app-release.aab
+            dist/**/*.apk
+
+      - name: Telegram – Success Summary
+        if: success() && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHANNEL_ID != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHANNEL_ID}" \
+            --data-urlencode text="🚀 Assets Recovery $VERSION ($BUILD_NUMBER) released!
+📱 APK delivered to Telegram channel
+🧪 Uploaded to Google Play Internal Testing
+🌐 Uploaded to Google Play Production (rollout: $ROLLOUT)"
+
+  notify-failure:
+    name: Notify failure
+    needs: [checks, android, release]
+    if: always() && contains(needs.*.result, 'failure') && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHANNEL_ID != ''
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHANNEL_ID}" \
+            --data-urlencode text="❌ Assets Recovery release FAILED (${GITHUB_REF_NAME}). ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

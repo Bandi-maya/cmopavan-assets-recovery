@@ -1,0 +1,122 @@
+name: Google Play – Internal & Testing Tracks
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Play Console track'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+      status:
+        description: 'Release status (use "draft" until the app has been published once)'
+        required: true
+        default: 'completed'
+        type: choice
+        options:
+          - completed
+          - draft
+
+jobs:
+  build-and-deploy:
+    name: Build AAB & Deploy to ${{ inputs.track }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x ./gradlew
+
+      - name: Run Unit Tests
+        run: ./gradlew test
+
+      - name: Set Version Code & Name
+        run: |
+          # Monotonically increasing version code based on minutes since epoch
+          BUILD_NUMBER=$(( $(date +%s) / 60 ))
+          echo "VERSION_CODE=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=1.0.0" >> "$GITHUB_ENV"
+
+      - name: Configure Android Release Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/upload-keystore.jks
+          
+          cat <<EOF > key.properties
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=upload
+          storeFile=app/upload-keystore.jks
+          EOF
+
+      - name: Build Android App Bundle (AAB)
+        run: |
+          ./gradlew bundleRelease "-PversionCode=$VERSION_CODE" "-PversionName=$VERSION_NAME"
+
+      - name: Upload AAB as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-recovery-internal-aab
+          path: app/build/outputs/bundle/release/app-release.aab
+          retention-days: 14
+
+      - name: Upload to Google Play (${{ inputs.track }})
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_CONFIG_JSON }}
+          packageName: com.logybyte.assetsrecovery
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          releaseName: ${{ env.VERSION_NAME }} (${{ env.VERSION_CODE }})
+          tracks: ${{ inputs.track }}
+          status: ${{ inputs.status }}
+
+      - name: Telegram – Success Notification
+        if: success() && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHANNEL_ID != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        run: |
+          COMMIT_SHA="${GITHUB_SHA::7}"
+          MESSAGE=$(cat <<EOF
+          🚀 Assets Recovery uploaded to Google Play (${{ inputs.track }})!
+          🏷 Version: $VERSION_NAME ($VERSION_CODE)
+          🔗 Commit: $COMMIT_SHA
+          📊 Track: ${{ inputs.track }} (Status: ${{ inputs.status }})
+          EOF
+          )
+          
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHANNEL_ID}" \
+            -d text="$MESSAGE"
+
+      - name: Telegram – Failure Notification
+        if: failure() && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHANNEL_ID != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        run: |
+          COMMIT_SHA="${GITHUB_SHA::7}"
+          MESSAGE=$(cat <<EOF
+          ❌ Assets Recovery Play Store deployment FAILED!
+          Track: ${{ inputs.track }}
+          Commit: $COMMIT_SHA
+          Run ID: $GITHUB_RUN_ID
+          Check GitHub Actions for details.
+          EOF
+          )
+          
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHANNEL_ID}" \
+            -d text="$MESSAGE"
