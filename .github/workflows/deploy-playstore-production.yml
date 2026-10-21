@@ -161,9 +161,22 @@ jobs:
           mkdir -p whatsnew
           PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
           if [ -n "$PREV" ]; then RANGE="$PREV..HEAD"; else RANGE="HEAD~20..HEAD"; fi
-          NOTES=$(git log $RANGE --pretty=format:'• %s' --no-merges | grep -v -i '^• \(merge\|chore\|ci\)' | head -n 12)
-          [ -z "$NOTES" ] && NOTES="Bug fixes and improvements."
-          printf '%s' "$NOTES" | cut -c1-500 > whatsnew/whatsnew-en-US
+          RAW_NOTES=$(git log $RANGE --pretty=format:'• %s' --no-merges | grep -v -i '^• \(merge\|chore\|ci\)' | head -n 8)
+          [ -z "$RAW_NOTES" ] && RAW_NOTES="Bug fixes and improvements."
+          
+          export RAW_NOTES
+          python3 -c "
+          import os
+          notes = os.environ.get('RAW_NOTES', 'Bug fixes and improvements.').strip()
+          # Google Play enforces strict max 500 characters
+          if len(notes) > 490:
+              truncated = notes[:485]
+              last_nl = truncated.rfind('\n')
+              notes = (truncated[:last_nl] if last_nl > 60 else truncated) + '...'
+          with open('whatsnew/whatsnew-en-US', 'w', encoding='utf-8') as f:
+              f.write(notes)
+          "
+          echo "Release notes character count: $(wc -m < whatsnew/whatsnew-en-US) (max 500)"
           cat whatsnew/whatsnew-en-US
 
       - name: Find R8 mapping file
