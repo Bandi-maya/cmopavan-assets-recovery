@@ -35,3 +35,13 @@ enum class SortOrder {
     NAME_ASC,
     NAME_DESC
 }
+<<<<<<< HEAD
+
+enum class RecoveryConfidence {
+    HIGH,
+    MEDIUM,
+    LOW,
+    CORRUPTED
+}
+=======
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53

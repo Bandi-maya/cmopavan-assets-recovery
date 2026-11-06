@@ -9,6 +9,10 @@ import android.os.Environment
 import android.provider.MediaStore
 import com.logybyte.assetsrecovery.data.model.MediaItem
 import com.logybyte.assetsrecovery.data.model.MediaType
+<<<<<<< HEAD
+import com.logybyte.assetsrecovery.data.model.RecoveryConfidence
+=======
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
 import com.logybyte.assetsrecovery.data.model.RecoveryResult
 import com.logybyte.assetsrecovery.data.model.RecoveryStatus
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +21,11 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
+<<<<<<< HEAD
+import java.security.MessageDigest
+=======
 import java.io.OutputStream
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
 
 class RecoveryEngine(private val context: Context) {
 
@@ -42,13 +50,44 @@ class RecoveryEngine(private val context: Context) {
             }
 
             try {
+<<<<<<< HEAD
+                // If it's a MediaStore trashed item, first try direct untrash restoration if permitted
+                var restoredUri: Uri? = null
+                if (item.isTrashed && item.uri.scheme == "content" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    try {
+                        val unTrashValues = ContentValues().apply {
+                            put(MediaStore.MediaColumns.IS_TRASHED, 0)
+                        }
+                        val rows = context.contentResolver.update(item.uri, unTrashValues, null, null)
+                        if (rows > 0) {
+                            restoredUri = item.uri
+                        }
+                    } catch (e: Exception) {
+                        // Fall back to copy recovery
+                        restoredUri = null
+                    }
+                }
+
+                // If untrash didn't run or wasn't applicable, copy to RecoveredMedia directory
+                if (restoredUri == null) {
+                    restoredUri = recoverSingleItemByCopy(item)
+                }
+
+                if (restoredUri != null && verifyRecoveredFile(restoredUri, item.size)) {
+=======
                 val recoveredUri = recoverSingleItem(item)
                 if (recoveredUri != null && verifyRecoveredFile(recoveredUri, item.size)) {
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
                     succeeded++
                     updatedItems.add(
                         item.copy(
                             recoveryStatus = RecoveryStatus.RECOVERED,
+<<<<<<< HEAD
+                            recoveryPath = restoredUri.toString(),
+                            integrityConfidence = RecoveryConfidence.HIGH
+=======
                             recoveryPath = recoveredUri.toString()
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
                         )
                     )
                 } else {
@@ -72,7 +111,11 @@ class RecoveryEngine(private val context: Context) {
         )
     }
 
+<<<<<<< HEAD
+    private fun recoverSingleItemByCopy(item: MediaItem): Uri? {
+=======
     private fun recoverSingleItem(item: MediaItem): Uri? {
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
         val resolver = context.contentResolver
         val isImage = item.mediaType == MediaType.IMAGE
         val collection = if (isImage) {
@@ -90,7 +133,11 @@ class RecoveryEngine(private val context: Context) {
         val cleanName = getNonCollidingName(item.displayName)
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+<<<<<<< HEAD
+            // Android 10+ Scoped Storage MediaStore insertion
+=======
             // Android 10+ (API 29+) Scoped Storage MediaStore insertion
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, cleanName)
                 put(MediaStore.MediaColumns.MIME_TYPE, item.mimeType)
@@ -101,11 +148,35 @@ class RecoveryEngine(private val context: Context) {
             val targetUri = resolver.insert(collection, values) ?: return null
 
             var copySuccess = false
+<<<<<<< HEAD
+            var sourceChecksum: String? = null
+            var destChecksum: String? = null
+
+            try {
+                openSourceInputStream(item)?.use { input ->
+                    resolver.openOutputStream(targetUri)?.use { output ->
+                        val digestIn = MessageDigest.getInstance("SHA-256")
+                        val digestOut = MessageDigest.getInstance("SHA-256")
+
+                        val buffer = ByteArray(8192)
+                        var bytesRead: Int
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            digestIn.update(buffer, 0, bytesRead)
+                            output.write(buffer, 0, bytesRead)
+                            digestOut.update(buffer, 0, bytesRead)
+                        }
+                        output.flush()
+
+                        sourceChecksum = digestIn.digest().joinToString("") { "%02x".format(it) }
+                        destChecksum = digestOut.digest().joinToString("") { "%02x".format(it) }
+                        copySuccess = (sourceChecksum == destChecksum)
+=======
             try {
                 openSourceInputStream(item)?.use { input ->
                     resolver.openOutputStream(targetUri)?.use { output ->
                         input.copyTo(output)
                         copySuccess = true
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
                     }
                 }
             } finally {
@@ -133,8 +204,23 @@ class RecoveryEngine(private val context: Context) {
 
             openSourceInputStream(item)?.use { input ->
                 FileOutputStream(targetFile).use { output ->
+<<<<<<< HEAD
+                    val digestIn = MessageDigest.getInstance("SHA-256")
+                    val digestOut = MessageDigest.getInstance("SHA-256")
+
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        digestIn.update(buffer, 0, bytesRead)
+                        output.write(buffer, 0, bytesRead)
+                        digestOut.update(buffer, 0, bytesRead)
+                    }
+                    output.flush()
+                    copySuccess = (digestIn.digest().contentEquals(digestOut.digest()))
+=======
                     input.copyTo(output)
                     copySuccess = true
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
                 }
             }
 
@@ -193,7 +279,11 @@ class RecoveryEngine(private val context: Context) {
         val dotIndex = originalName.lastIndexOf('.')
         val prefix = if (dotIndex > 0) originalName.substring(0, dotIndex) else originalName
         val ext = if (dotIndex > 0) originalName.substring(dotIndex) else ""
+<<<<<<< HEAD
+        val timestamp = System.currentTimeMillis() % 100000
+=======
         val timestamp = System.currentTimeMillis() % 10000
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
         return "${prefix}_recovered_${timestamp}$ext"
     }
 }

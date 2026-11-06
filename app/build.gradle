@@ -18,6 +18,15 @@ android {
     }
 
     signingConfigs {
+<<<<<<< HEAD
+        debugConfig {
+            storeFile file("${rootDir}/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+=======
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
         release {
             def keystorePropertiesFile = rootProject.file("key.properties")
             if (keystorePropertiesFile.exists()) {
@@ -32,6 +41,12 @@ android {
     }
 
     buildTypes {
+<<<<<<< HEAD
+        debug {
+            signingConfig signingConfigs.debugConfig
+        }
+=======
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
         release {
             def keystorePropertiesFile = rootProject.file("key.properties")
             if (keystorePropertiesFile.exists()) {

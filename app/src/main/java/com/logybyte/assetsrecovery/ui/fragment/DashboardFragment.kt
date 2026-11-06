@@ -30,9 +30,14 @@ class DashboardFragment : Fragment() {
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
+<<<<<<< HEAD
+    ) { _ ->
+        if (PermissionHelper.hasStoragePermissions(requireContext())) {
+=======
     ) { permissions ->
         val allGranted = permissions.values.all { it }
         if (allGranted) {
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
             binding.cardPermission.visibility = View.GONE
             viewModel.startScan()
         } else {

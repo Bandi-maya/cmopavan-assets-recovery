@@ -5,6 +5,11 @@
     <!-- Android 13+ (API 33+) granular media permissions -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+<<<<<<< HEAD
+    <!-- Android 14+ (API 34+) partial photo picker permission -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+=======
+>>>>>>> 3d5e19e31eb8fcb5e39ab175672a81e2e22ffe53
 
     <!-- Android 12 and below permissions -->
     <uses-permission

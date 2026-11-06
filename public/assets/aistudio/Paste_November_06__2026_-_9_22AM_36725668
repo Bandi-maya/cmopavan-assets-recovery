@@ -1,0 +1,1080 @@
+Bandi, I inspected your actual GitHub repository and its core Kotlin implementation. There is one important issue we need to address before building this into a serious recovery product.
+
+**Your current app is primarily a media discovery and file-copying application, not yet a true deleted-file recovery engine.**
+
+We need to transform it into a much more capable Android recovery system, while preserving the existing functionality.
+
+# 1. Current repository audit
+
+Repository: [assets-recovery](https://github.com/Logybyte-Promotional-Products/assets-recovery?utm_source=chatgpt.com)
+
+### Existing architecture
+
+| Component | Current implementation |
+|---|---|
+| MediaScanner.kt | MediaStore and filesystem scanning |
+| RecoveryEngine.kt | Copies accessible files into RecoveredMedia |
+| RecoveryViewModel.kt | Scan and recovery state management |
+| MediaItem.kt | Media metadata and recovery status |
+| DashboardFragment.kt | Dashboard and scan controls |
+| GalleryFragment.kt | Image/video grid and filtering |
+| MediaGridAdapter.kt | Media presentation |
+| MediaDetailDialog.kt | Media preview and recovery |
+| PermissionHelper.kt | Storage permission handling |
+
+### Critical problems discovered
+
+**1. Deleted files are not actually being discovered.**
+
+The current scanner queries MediaStore with `MATCH_INCLUDE`, which includes both active and trashed media.
+
+It does not mean that permanently deleted files are being recovered.
+
+**2. Hidden files are incorrectly classified as recoverable.**
+
+A hidden image is not necessarily a deleted image. Your current implementation treats hidden files as recoverable.
+
+**3. RecoveryEngine only copies accessible source files.**
+
+If the original file is genuinely deleted and its contents are no longer accessible, the current recovery implementation cannot restore it.
+
+**4. Recovery verification needs improvement.**
+
+The current verification checks whether a stream contains readable data but doesn't properly validate file integrity against the original content.
+
+**5. Recovery coverage is incomplete.**
+
+The current models primarily support images and videos. General documents and other file types need a proper recovery architecture.
+
+**6. Permission handling needs modernization.**
+
+Android 14+ partial photo/video access and newer Android storage capabilities need to be handled correctly.
+
+---
+
+# 2. Research: The recovery technologies we should use
+
+There is an important distinction between restoring a file from trash and recovering permanently deleted storage data.
+
+These are different engineering problems.
+
+
+
+### Recovery technology stack
+
+| Technology | Purpose | Priority |
+|---|---|---|
+| MediaStore Trash | Restore trashed media | Critical |
+| Android 16+ deleted-file APIs | Discover tracked deleted external media where supported | Critical |
+| Storage Access Framework | User-authorized access to folders and SD cards | Critical |
+| File Signature Carving | Identify recoverable file structures | Advanced |
+| JPEG/PNG/HEIC parsing | Validate image structures | High |
+| MP4/MOV parsing | Validate video structures | High |
+| EXIF metadata analysis | Identify image metadata | High |
+| Thumbnail analysis | Discover surviving image previews | High |
+| Filesystem analysis | Identify filesystem metadata where permitted | Advanced |
+| SHA-256 verification | Verify recovered file integrity | Critical |
+| FFmpeg/Media parsing | Validate media streams | Advanced |
+
+Useful research references:
+
+- [Android MediaStore API](https://developer.android.com/reference/android/provider/MediaStore?utm_source=chatgpt.com)
+- [Android Scoped Storage](https://source.android.com/docs/core/storage/scoped?utm_source=chatgpt.com)
+- [Android Media Access Guide](https://developer.android.com/training/data-storage/shared/media?utm_source=chatgpt.com)
+- [Android Storage Access Framework](https://developer.android.com/training/data-storage/shared/documents-files?authuser=111&utm_source=chatgpt.com)
+
+**Important technical limitation:** Android does not allow an ordinary application to freely read raw internal storage partitions. On modern encrypted Android devices, permanently deleted data may be inaccessible because of filesystem restrictions, encryption and storage TRIM.
+
+No algorithm, AI model or machine-learning system can reconstruct file contents that no longer exist in accessible storage.
+
+We should maximize legitimate recovery opportunities without making false recovery promises.
+
+---
+
+# 3. Master implementation prompt
+
+I've prepared the following prompt for your coding agent.
+
+It covers repository inspection, research, recovery algorithms, architecture, PRD, implementation, testing, performance and UI/UX.
+
+Copy everything below.
+
+## MASTER PROMPT — ASSETS RECOVERY ENGINE
+
+```text
+ROLE:
+
+You are a principal Android systems engineer, senior Kotlin
+developer, Android storage and filesystem specialist,
+digital forensics engineer, performance engineer,
+security architect, and professional UI/UX designer.
+
+PROJECT:
+Assets Recovery
+
+REPOSITORY:
+https://github.com/Logybyte-Promotional-Products/assets-recovery.git
+
+BRANCH:
+main
+
+PACKAGE:
+com.logybyte.assetsrecovery
+
+TECHNOLOGY:
+Native Android Kotlin.
+
+EXISTING STACK:
+- Kotlin 1.9+
+- Android SDK
+- Gradle
+- AndroidX
+- Coroutines and Flow
+- ViewBinding
+- RecyclerView
+- MediaStore
+- Storage Access Framework
+- Coil
+
+PRIMARY OBJECTIVE:
+
+Transform Assets Recovery into a professional Android
+deleted-file discovery and recovery application.
+
+When a user installs and opens the application:
+
+1. Explain the recovery capabilities.
+2. Request the appropriate user permissions.
+3. Identify accessible storage volumes.
+4. Scan for recoverable images.
+5. Scan for recoverable videos.
+6. Scan for recoverable documents.
+7. Discover available deleted-file records.
+8. Discover accessible trash and backup locations.
+9. Analyze available media fragments and thumbnails.
+10. Display genuine recovery candidates.
+11. Allow the user to preview candidates.
+12. Allow the user to select files.
+13. Recover selected files with explicit user consent.
+14. Verify recovered file integrity.
+15. Save recovered files to a user-accessible location.
+
+The application must maximize recovery opportunities
+while respecting Android security restrictions.
+
+==================================================
+PHASE 01 — TEAM AND SKILL DISCOVERY
+==================================================
+
+First inspect the available agent and skill environment.
+
+Identify relevant skills for:
+
+- Android development
+- Kotlin architecture
+- Android storage
+- Filesystem analysis
+- Digital forensics
+- Binary file parsing
+- Image processing
+- Video processing
+- Security
+- Performance optimization
+- Accessibility
+- UI/UX
+- Testing
+- Architecture documentation
+
+Use available subagents when the environment actually
+supports independent parallel execution.
+
+Do not pretend that unavailable agents or skills exist.
+
+Assign independent workstreams:
+
+AGENT 01:
+Repository architecture and existing implementation audit.
+
+AGENT 02:
+Android storage and permission research.
+
+AGENT 03:
+Deleted-file recovery algorithms and forensic research.
+
+AGENT 04:
+Image and video recovery engineering.
+
+AGENT 05:
+Document and general-file recovery engineering.
+
+AGENT 06:
+Performance and memory optimization.
+
+AGENT 07:
+Security and privacy audit.
+
+AGENT 08:
+UI/UX research and design.
+
+AGENT 09:
+Testing and quality assurance.
+
+AGENT 10:
+Technical documentation and PRD.
+
+Merge findings before implementation.
+
+==================================================
+PHASE 02 — COMPLETE REPOSITORY AUDIT
+==================================================
+
+Read the entire repository.
+
+Do not inspect only the main files.
+
+Inspect:
+
+- All Kotlin source files.
+- All XML layouts.
+- All drawable resources.
+- All navigation resources.
+- All Gradle configurations.
+- All manifests.
+- All permissions.
+- All existing tests.
+- All GitHub Actions workflows.
+- All documentation.
+- Existing architecture and dependencies.
+
+Understand the complete execution flow.
+
+Trace:
+
+Application launch
+    -> Permission handling
+    -> Storage discovery
+    -> Media scanning
+    -> Candidate classification
+    -> Media preview
+    -> File recovery
+    -> File verification
+    -> Recovered media storage
+
+Identify:
+
+- Existing bugs.
+- Missing capabilities.
+- Incorrect recovery classifications.
+- Permission problems.
+- Memory leaks.
+- Performance bottlenecks.
+- Duplicate scanning.
+- File corruption possibilities.
+- Threading problems.
+- Lifecycle problems.
+- Unsupported Android versions.
+
+Create:
+
+REPOSITORY_AUDIT.md
+
+Do not remove existing functionality.
+
+==================================================
+PHASE 03 — DEEP INTERNET RESEARCH
+==================================================
+
+Research current Android recovery technologies.
+
+Use official Android documentation first.
+
+Study:
+
+1. Android MediaStore.
+2. MediaStore trash handling.
+3. Android deleted-file tracking APIs.
+4. Android Storage Access Framework.
+5. Android scoped storage.
+6. Android granular media permissions.
+7. Android 14 partial media permissions.
+8. Android storage volumes.
+9. Android removable SD cards.
+10. Android filesystem restrictions.
+11. Android encryption.
+12. Android FUSE.
+13. Android file descriptors.
+14. Android background processing.
+
+Study professional recovery tools:
+
+- PhotoRec.
+- TestDisk.
+- Foremost.
+- Scalpel.
+- libmagic.
+- FFmpeg.
+- ExifTool.
+- Sleuth Kit.
+- MediaInfo.
+
+Study their actual algorithms and capabilities.
+
+IMPORTANT:
+
+Do not blindly port desktop Linux recovery tools
+into Android.
+
+For each technology, establish:
+
+- Android compatibility.
+- Required permissions.
+- Required privileges.
+- Filesystem requirements.
+- CPU requirements.
+- Memory requirements.
+- Storage requirements.
+- Licensing.
+- Security implications.
+- Whether implementation is possible without root.
+
+Never claim that a technology can recover permanently
+deleted internal storage data without demonstrating
+that the required storage access is actually available.
+
+Create:
+
+RECOVERY_RESEARCH.md
+
+Include technical references and implementation decisions.
+
+==================================================
+PHASE 04 — RECOVERY CAPABILITY CLASSIFICATION
+==================================================
+
+Create separate recovery strategies.
+
+STRATEGY A — SYSTEM TRASH RECOVERY
+
+Discover media that remains in Android's trash.
+
+Use supported MediaStore APIs.
+
+Where supported, investigate:
+
+- IS_TRASHED.
+- MATCH_INCLUDE.
+- Android's deleted-file tracking APIs.
+- restoreFileFromTrash.
+- Appropriate user-consent flows.
+
+Use API-level checks.
+
+Do not assume every device supports the same APIs.
+
+STRATEGY B — MEDIASTORE DELETED-FILE DISCOVERY
+
+Investigate Android's newer deleted-file tracking APIs.
+
+Use them only when supported by the device's API
+and SDK extension level.
+
+Check their documented limitations.
+
+Do not interpret missing results as proof that
+a file never existed.
+
+STRATEGY C — ACCESSIBLE FILE DISCOVERY
+
+Inspect user-authorized storage locations.
+
+Discover:
+
+- Existing media.
+- Hidden media.
+- Orphaned media.
+- App-accessible cache files.
+- Thumbnails.
+- Duplicate media.
+- Backup copies.
+
+Do not classify existing hidden files as deleted.
+
+STRATEGY D — FILE SIGNATURE CARVING
+
+Research whether genuine file carving is possible
+on each supported storage type.
+
+Implement only where actual readable byte access
+is available and legally permitted.
+
+Study signatures for:
+
+JPEG
+PNG
+GIF
+WEBP
+HEIC
+MP4
+MOV
+3GP
+PDF
+ZIP
+DOCX
+XLSX
+PPTX
+
+Use format-specific parsers.
+
+Detect:
+
+- File headers.
+- File footers where applicable.
+- Container structures.
+- Chunk boundaries.
+- Metadata.
+- Corrupt sections.
+- Truncated files.
+
+Never assume that a matching header means
+the complete file is recoverable.
+
+STRATEGY E — THUMBNAIL AND CACHE DISCOVERY
+
+Discover accessible thumbnail databases and caches.
+
+Identify surviving previews of missing original media.
+
+Clearly distinguish:
+
+Original recovered file
+Recovered thumbnail
+Preview only
+Corrupted media
+Incomplete media
+
+Never present a thumbnail as a full-resolution
+recovered image.
+
+STRATEGY F — USER-PROVIDED BACKUPS
+
+Allow users to select accessible backup folders
+and external storage locations.
+
+Investigate supported backup formats.
+
+Never access protected application data without
+the required system authorization.
+
+==================================================
+PHASE 05 — RECOVERY ENGINE ARCHITECTURE
+==================================================
+
+Build a modular recovery architecture.
+
+Suggested structure:
+
+data/
+    model/
+    database/
+    repository/
+    storage/
+
+recovery/
+    engine/
+    coordinator/
+    strategy/
+        MediaStoreTrashStrategy.kt
+        DeletedFilesStrategy.kt
+        ThumbnailRecoveryStrategy.kt
+        CacheRecoveryStrategy.kt
+        FileCarvingStrategy.kt
+        BackupRecoveryStrategy.kt
+
+    scanner/
+        StorageScanner.kt
+        MediaScanner.kt
+        DocumentScanner.kt
+        VolumeScanner.kt
+
+    parser/
+        ImageParser.kt
+        VideoParser.kt
+        DocumentParser.kt
+        FileSignatureParser.kt
+
+    validator/
+        FileIntegrityValidator.kt
+        ImageValidator.kt
+        VideoValidator.kt
+        ChecksumValidator.kt
+
+    writer/
+        RecoveryWriter.kt
+
+    security/
+        RecoverySecurityManager.kt
+
+    progress/
+        RecoveryProgressManager.kt
+
+Use interfaces for recovery strategies.
+
+Each strategy must report:
+
+- Whether it is supported.
+- Whether permissions are available.
+- What storage it can access.
+- Number of candidates discovered.
+- Number of recoverable files.
+- Number of incomplete files.
+- Number of failed attempts.
+- Recovery limitations.
+
+Use a recovery coordinator to combine results.
+
+Prevent duplicate candidates across strategies.
+
+==================================================
+PHASE 06 — RECOVERY ALGORITHMS
+==================================================
+
+Implement and evaluate appropriate algorithms.
+
+A. File signature detection.
+
+B. Format-aware parsing.
+
+C. JPEG marker analysis.
+
+D. PNG chunk validation.
+
+E. WebP container validation.
+
+F. HEIF/HEIC container parsing.
+
+G. MP4 atom parsing.
+
+H. MOV container validation.
+
+I. PDF structure validation.
+
+J. ZIP-based document validation.
+
+K. Thumbnail identification.
+
+L. Metadata correlation.
+
+M. File fragmentation analysis where technically
+   possible using accessible storage data.
+
+N. Checksum verification.
+
+O. Recovery confidence classification.
+
+P. Duplicate detection.
+
+Q. Partial-file detection.
+
+R. Corruption detection.
+
+For every algorithm document:
+
+- Input.
+- Output.
+- Preconditions.
+- Limitations.
+- Complexity.
+- Memory requirements.
+- CPU requirements.
+- Supported formats.
+- Unit tests.
+
+Do not introduce machine learning merely for marketing.
+
+AI may assist with:
+
+- Media categorization.
+- Image similarity.
+- Duplicate detection.
+- Candidate ranking.
+- Corruption classification.
+
+AI cannot reconstruct inaccessible original file bytes.
+
+Prefer deterministic algorithms for actual recovery.
+
+==================================================
+PHASE 07 — RECOVERY WORKFLOW
+==================================================
+
+Build the following user journey.
+
+FIRST LAUNCH:
+
+1. Professional welcome screen.
+2. Explain exactly what can be recovered.
+3. Explain limitations honestly.
+4. Explain requested permissions.
+5. Ask for user permission.
+6. Identify accessible storage.
+7. Start the initial scan.
+
+SCANNING:
+
+Display:
+
+- Storage volumes.
+- Scan progress.
+- Images discovered.
+- Videos discovered.
+- Documents discovered.
+- Trash candidates.
+- Thumbnail candidates.
+- Scan speed.
+- Estimated remaining time.
+- Current recovery strategy.
+
+RESULTS:
+
+Provide separate sections:
+
+- Recoverable Images.
+- Recoverable Videos.
+- Recoverable Documents.
+- Recently Deleted.
+- Thumbnails.
+- Incomplete Files.
+- Corrupted Files.
+- Other Files.
+
+Each candidate should display:
+
+- Preview.
+- Original filename, if known.
+- File format.
+- File size.
+- Last known modification time.
+- Discovery source.
+- Recovery status.
+- Recovery confidence.
+- Integrity status.
+
+RECOVERY:
+
+1. User selects files.
+2. Display recovery summary.
+3. Ask for confirmation.
+4. Select destination.
+5. Recover without overwriting existing files.
+6. Validate the output.
+7. Verify file integrity.
+8. Report individual results.
+
+Use partial recovery status where appropriate.
+
+Never report a successful recovery unless
+the output has actually passed validation.
+
+==================================================
+PHASE 08 — PERMISSION AND SECURITY ARCHITECTURE
+==================================================
+
+Support Android API 26 through the latest
+compatible Android release.
+
+Research and implement correct handling of:
+
+- READ_MEDIA_IMAGES.
+- READ_MEDIA_VIDEO.
+- READ_MEDIA_VISUAL_USER_SELECTED.
+- READ_EXTERNAL_STORAGE.
+- Storage Access Framework.
+- Persistable URI permissions.
+- Removable storage.
+- User-authorized folder access.
+- Special storage permissions only when justified.
+
+Never request unnecessary permissions.
+
+Do not promise access to:
+
+- Other applications' protected private directories.
+- Internal storage partitions.
+- Raw flash memory.
+- Inaccessible filesystem blocks.
+
+Use scoped storage wherever possible.
+
+Do not upload private user media to servers.
+
+Keep processing on-device by default.
+
+==================================================
+PHASE 09 — DATA SAFETY
+==================================================
+
+Recovery must never overwrite original files.
+
+Write recovered files into temporary destinations.
+
+Validate them before marking them recovered.
+
+Use atomic finalization where supported.
+
+Use SHA-256 checksums for output integrity.
+
+Handle:
+
+- Insufficient storage.
+- Permission revocation.
+- Device restart.
+- Process termination.
+- Corrupt source data.
+- Interrupted writes.
+- Duplicate filenames.
+- Unsupported formats.
+- Missing source files.
+- Invalid storage volumes.
+
+Maintain recoverable progress.
+
+Never delete a source file during recovery.
+
+Never silently modify the original file.
+
+==================================================
+PHASE 10 — PERFORMANCE
+==================================================
+
+Optimize for low-end and high-end Android devices.
+
+Priorities:
+
+- Low memory consumption.
+- Efficient directory traversal.
+- Bounded concurrency.
+- Streaming file processing.
+- Coroutine cancellation.
+- Backpressure.
+- Incremental scanning.
+- Thumbnail caching.
+- Lazy media loading.
+- Efficient database indexing.
+- No main-thread disk operations.
+- No unnecessary byte-array allocation.
+
+Never load entire large videos into memory.
+
+Use streaming I/O.
+
+Use appropriate dispatchers.
+
+Benchmark on real devices.
+
+Target smooth 60/90/120/144Hz UI where hardware
+and display capabilities support it.
+
+Do not sacrifice reliability for artificial benchmarks.
+
+==================================================
+PHASE 11 — UI/UX RESEARCH AND DESIGN
+==================================================
+
+Research professional recovery applications.
+
+Study:
+
+- DiskDigger.
+- Dumpster.
+- PhotoRec.
+- EaseUS Data Recovery.
+- Recuva.
+- Dr.Fone.
+- Google Photos trash.
+- Samsung Gallery trash.
+- OneDrive recycle bin.
+
+Research the existing design references:
+
+21st.dev
+React Bits
+Magic UI
+shadcn/ui
+Ant Design
+MUI
+Origin UI
+COSS UI
+Skiper UI
+ThreeUI
+Motion
+Aceternity UI
+Radix UI
+Base UI
+Kibo UI
+Chakra UI
+Cult UI
+React Aria
+Headless UI
+Tailwind UI
+Park UI
+Mantine
+Tremor
+Motion Primitives
+SmoothUI
+OriginKit
+
+Also investigate relevant mobile design references
+and at least 50 additional useful design resources.
+
+Use web component libraries for inspiration only.
+
+DO NOT install unnecessary external libraries.
+
+Build the application natively in Kotlin.
+
+Apply:
+
+01. Fitts's Law.
+02. Hick's Law.
+03. Jakob's Law.
+04. Miller's Law.
+05. Zeigarnik Effect.
+06. Von Restorff Effect.
+07. Goal Gradient Effect.
+08. Doherty Threshold.
+09. Gestalt Principles.
+10. Recognition over Recall.
+11. Progressive Disclosure.
+12. Visibility of System Status.
+13. Error Prevention.
+14. Consistency and Standards.
+
+DESIGN REQUIREMENTS:
+
+- Professional production-quality interface.
+- Responsive layouts.
+- No stretched components.
+- Proper minimum touch targets.
+- Dynamic layouts.
+- Accessible typography.
+- Dark and light themes.
+- Custom SVG icons.
+- No emoji as interface icons.
+- Meaningful empty states.
+- Meaningful loading states.
+- Skeleton loading where useful.
+- Clear recovery feedback.
+- Smooth transitions.
+- Physics-based micro-interactions.
+
+Create custom reusable animation components.
+
+Telegram-inspired animation quality is a reference
+for expressive motion, not an instruction to copy
+Telegram assets or animations.
+
+Do not sacrifice scan speed or battery life
+for decorative animations.
+
+==================================================
+PHASE 12 — TESTING
+==================================================
+
+Create comprehensive tests.
+
+UNIT TESTS:
+
+- Media classification.
+- File signature detection.
+- File parsing.
+- Checksum validation.
+- Duplicate detection.
+- Recovery status.
+- Corrupt file handling.
+- Recovery confidence.
+
+INTEGRATION TESTS:
+
+- MediaStore access.
+- Trash restoration.
+- Storage Access Framework.
+- SD card access.
+- Recovery destination.
+- Permission revocation.
+- Recovery interruption.
+
+DEVICE TESTING:
+
+- Android 8.
+- Android 10.
+- Android 11.
+- Android 12.
+- Android 13.
+- Android 14.
+- Android 15.
+- Android 16.
+- Newer supported versions.
+
+Test different manufacturers where possible:
+
+- Samsung.
+- Xiaomi.
+- Redmi.
+- Vivo.
+- Oppo.
+- Realme.
+- OnePlus.
+- Google Pixel.
+
+Test:
+
+- Low storage.
+- Large media libraries.
+- Large videos.
+- Slow storage.
+- Corrupted media.
+- Missing files.
+- No permissions.
+- Partial permissions.
+- App restart during recovery.
+
+Never claim tests passed unless they were executed.
+
+==================================================
+PHASE 13 — DOCUMENTATION
+==================================================
+
+Create:
+
+PRD.md
+REPOSITORY_AUDIT.md
+RECOVERY_RESEARCH.md
+RECOVERY_ARCHITECTURE.md
+RECOVERY_ALGORITHMS.md
+RECOVERY_IMPLEMENTATION_PLAN.md
+PERMISSIONS_AND_PRIVACY.md
+PERFORMANCE_REPORT.md
+TESTING_REPORT.md
+KNOWN_LIMITATIONS.md
+
+==================================================
+PHASE 14 — IMPLEMENTATION ORDER
+==================================================
+
+Follow this sequence:
+
+1. Complete repository audit.
+2. Complete technology research.
+3. Identify real Android recovery capabilities.
+4. Document technical limitations.
+5. Create PRD.
+6. Create architecture.
+7. Create implementation plan.
+8. Implement recovery foundations.
+9. Implement each recovery strategy.
+10. Implement file validation.
+11. Implement recovery coordination.
+12. Integrate with existing UI.
+13. Improve user experience.
+14. Optimize performance.
+15. Run tests.
+16. Perform regression testing.
+17. Review every changed file.
+18. Prepare GitHub pull request.
+
+Preserve all existing functionality.
+
+Do not rewrite working modules unnecessarily.
+
+Do not introduce breaking changes.
+
+Do not install external libraries without proving
+that they are necessary and compatible with the
+project requirements.
+
+==================================================
+FINAL ACCEPTANCE CRITERIA
+==================================================
+
+The finished application must:
+
+1. Discover genuinely recoverable candidates.
+2. Distinguish deleted files from existing files.
+3. Restore accessible trashed media.
+4. Support images and videos.
+5. Provide extensible document recovery.
+6. Support user-authorized storage locations.
+7. Validate recovered files.
+8. Never falsely report recovery success.
+9. Never overwrite original data.
+10. Preserve existing application functionality.
+11. Work across supported Android versions.
+12. Remain responsive on low-end devices.
+13. Protect user privacy.
+14. Explain unsupported recovery operations honestly.
+15. Have automated tests.
+
+IMPORTANT FINAL RULE:
+
+Do not start by redesigning the dashboard.
+
+First solve the actual recovery-engine problem.
+
+The quality of the recovery engine is the product's
+most important feature.
+
+Build a genuine recovery product, not an application
+that simply scans existing photos and copies them
+into another folder.
+```
+
+---
+
+# 4. My recommended implementation roadmap
+
+I would prioritize development in this order:
+
+| Phase | Deliverable | Priority |
+|---|---|---|
+| 1 | Fix existing scanner classification | Critical |
+| 2 | Implement genuine trash restoration | Critical |
+| 3 | Implement newer deleted-file discovery APIs | Critical |
+| 4 | Implement storage and SD card discovery | High |
+| 5 | Implement thumbnail/cache recovery | High |
+| 6 | Build format-aware recovery engine | High |
+| 7 | Implement file integrity verification | Critical |
+| 8 | Add document recovery | High |
+| 9 | Add advanced carving where permitted | Advanced |
+| 10 | Optimize UI and performance | High |
+
+### One particularly important opportunity
+
+Investigate Android's newer `MediaStore.queryDeletedFiles()` API and `restoreFileFromTrash()` API.
+
+These provide a much better foundation for genuine deleted-file discovery than the current implementation.
+
+However, these APIs have platform and storage limitations. In particular, deleted-file tracking is limited to external volumes and does not guarantee recovery of every deleted file. [Android Developers](https://developer.android.com/reference/android/provider/MediaStore?utm_source=chatgpt.com)
+
+---
+
+# 5. My final recommendation
+
+Build Assets Recovery around three independent recovery layers:
+
+**Layer 1 — Native Android Recovery**
+
+Recover files that Android still tracks in its trash or deleted-file records.
+
+**Layer 2 — Accessible Storage Recovery**
+
+Discover surviving thumbnails, caches, backups, orphaned media and files in user-authorized folders.
+
+**Layer 3 — Advanced Forensic Recovery**
+
+Use signature carving, container parsing and filesystem analysis when the required storage access genuinely exists.
+
+This architecture is considerably more realistic and powerful than relying on one scanning algorithm.
+
+**The most important rule: Never show users a file as recoverable just because its filename or thumbnail was discovered.**
+
+Show the actual recovery capability, validate the bytes, and only then report success.

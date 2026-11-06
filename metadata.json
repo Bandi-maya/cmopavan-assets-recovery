@@ -1,0 +1,6 @@
+{
+  "name": "Assets Recovery",
+  "description": "Find and restore accessible images and videos from device storage, trash, and hidden folders.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
